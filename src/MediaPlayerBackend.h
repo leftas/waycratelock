@@ -146,7 +146,6 @@ Q_SIGNALS:
     void CanPauseChanged();
     void PlaybackStatusChanged();
 
-
 private Q_SLOTS:
     void onPropertyChanged(const QDBusMessage &msg);
 };

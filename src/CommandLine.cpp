@@ -1,6 +1,11 @@
 #include "CommandLine.h"
 
-#ifndef DEBUG_MODE
+#ifdef DEBUG_MODE
+#define NON_DEBUG(EXP)                                                                             \
+    do {                                                                                           \
+    } while (0)
+#else
+#define NON_DEBUG(EXP) EXP
 #include <SessionLockQt/command.h>
 #endif
 
@@ -131,8 +136,8 @@ CommandLine::readConfig()
         auto tbl                              = toml::parse_file(configpath.toStdString());
         std::optional<bool> usePam            = tbl["needPassword"].value<bool>();
         std::optional<std::string> background = tbl["background"]["path"].value<std::string>();
-        std::optional<double> opacity          = tbl["background"]["opacity"].value<float>();
-        m_opacity                             = opacity.value_or(0.6);
+        std::optional<double> opacity         = tbl["background"]["opacity"].value<float>();
+        m_opacity                             = opacity.value_or(1);
         m_usePam                              = usePam.value_or(true);
         if (background.has_value()) {
             QString backgroundPath = QString::fromStdString(background.value());
@@ -162,10 +167,15 @@ CommandLine::setPassword(const QString &password)
 void
 CommandLine::UnLock()
 {
-#ifndef DEBUG_MODE
-    ExtSessionLockV1Qt::Command::instance()->unLockScreen();
-#endif
+    NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->unLockScreen();)
     QTimer::singleShot(0, qApp, [] { QGuiApplication::quit(); });
+}
+
+void
+CommandLine::errorMessage(QString message)
+{
+    setErrorMessage(message);
+    QTimer::singleShot(3000, [this] { setErrorMessage(""); });
 }
 
 void
@@ -177,8 +187,7 @@ CommandLine::RequestUnlock()
     }
 
     if (m_password.isEmpty()) {
-        m_errorMessage = "password is needed";
-        Q_EMIT errorMessageChanged();
+        errorMessage("Password cannot be empty.");
         return;
     }
 
@@ -190,14 +199,14 @@ CommandLine::RequestUnlock()
         }
         pam_setcred(m_handle, PAM_REFRESH_CRED);
         if (pam_end(m_handle, pam_status)) {
-            qWarning() << "Pam end failer";
+            qWarning() << "Pam end failed";
             return PamStatus::PamEndFailed;
         }
         return PamStatus::Successed;
     }).then([this](PamStatus value) {
         switch (value) {
         case PamEndFailed: {
-            qWarning() << "Pam end failer";
+            qWarning() << "Pam end failed";
             UnLock();
             break;
         }
@@ -206,8 +215,7 @@ CommandLine::RequestUnlock()
             break;
         }
         case Failed: {
-            m_errorMessage = "password is error, failed to unlock";
-            Q_EMIT errorMessageChanged();
+            errorMessage("Failed to unlock. Check your password");
             break;
         }
         }

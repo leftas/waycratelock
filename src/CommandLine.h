@@ -41,7 +41,8 @@ public:
     Q_PROPERTY(QString userName READ userName NOTIFY userNameChanged)
     inline QString userName() { return m_userName; }
 
-    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
+    Q_PROPERTY(
+      QString errorMessage READ errorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
     inline QString errorMessage() { return m_errorMessage; }
 
     Q_PROPERTY(bool usePam READ usePam NOTIFY usePamChanged)
@@ -58,6 +59,13 @@ public:
 
 private:
     void readConfig();
+
+    void setErrorMessage(QString message)
+    {
+        m_errorMessage = message;
+        emit errorMessageChanged();
+    }
+    void errorMessage(QString message);
 
 signals:
     void currentDateChanged();
