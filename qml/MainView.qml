@@ -111,7 +111,6 @@ Page {
             }
 
             RoundButton {
-                id: loginBtn
                 visible: root.isIn
                 implicitWidth: 60
                 implicitHeight: 60
