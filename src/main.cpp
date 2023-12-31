@@ -1,7 +1,13 @@
+#include "CommandLine.h"
+#include "MediaPlayerBackend.h"
+#include <private/qwaylandinputdevice_p.h>
+#include <private/qwaylandshellintegration_p.h>
+#include <private/qwaylandwindow_p.h>
+#include <qnamespace.h>
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
     do {                                                                                           \
-    } while (0)
+    } while (0);
 #else
 #define NON_DEBUG(EXP) EXP
 #include <SessionLockQt/command.h>
@@ -11,31 +17,21 @@
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-#include <QQuickStyle>
-#include <QQuickStyle>
 #include <QQuickItem>
-#include <QWindow>
+#include <QQuickStyle>
+#include <QQuickWindow>
 
-#include <algorithm>
-#include <cstdlib>
+QtWaylandClient::QWaylandWindow *oldWindow = nullptr;
 
 int
 main(int argc, char *argv[])
 {
     NON_DEBUG(ExtSessionLockV1Qt::Shell::useExtSessionLock();)
-
     QGuiApplication app(argc, argv);
     QQuickStyle::setStyle("Material");
-    QQmlApplicationEngine engine;
     auto screens = QGuiApplication::screens();
     const QUrl url(u"qrc:/WayCrateLock/qml/main.qml"_qs);
-
-    QObject::connect(&app,
-                     &QGuiApplication::focusWindowChanged,
-                     &app,
-                     [&app](QWindow* window) {
-                        // window->findChild<QQuickItem*>("root")->forceActiveFocus(Qt::FocusReason::ActiveWindowFocusReason);
-                     });
+    QQmlApplicationEngine engine;
     QObject::connect(
       &engine,
       &QQmlApplicationEngine::objectCreated,
@@ -46,9 +42,30 @@ main(int argc, char *argv[])
       },
       Qt::QueuedConnection);
 
+    qmlRegisterSingletonType<CommandLine>(
+      "WayCrateLock", 1, 0, "CommandLine", [](QQmlEngine *, QJSEngine *) -> QObject * {
+          return new CommandLine();
+      });
+    qmlRegisterSingletonType<MediaPlayerBackend>(
+      "WayCrateLock", 1, 0, "MediaPlayerBackend", [](QQmlEngine *, QJSEngine *) -> QObject * {
+          return new MediaPlayerBackend();
+      });
     auto connectScreen = [&engine, url](auto screen) -> void {
         engine.load(url);
-        if (QWindow *window = qobject_cast<QWindow *>(engine.rootObjects().last())) {
+        if (QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last())) {
+            auto input = window->findChild<QQuickItem *>("input");
+            QObject::connect(input, &QQuickItem::focusChanged, input, [input](auto focus) {
+                if (focus) {
+                    auto focusWindow = input->window();
+                    auto wFocusWindow =
+                      dynamic_cast<QtWaylandClient::QWaylandWindow *>(focusWindow->handle());
+                    wFocusWindow->display()->handleWindowActivated(wFocusWindow);
+                    if (oldWindow && oldWindow != wFocusWindow) {
+                        oldWindow->display()->handleWindowDeactivated(oldWindow);
+                    }
+                    oldWindow = wFocusWindow;
+                }
+            });
             window->setScreen(screen);
             window->setGeometry(screen->geometry());
             NON_DEBUG(ExtSessionLockV1Qt::Window::registerWindowFromQtScreen(window, screen);)
@@ -67,7 +84,6 @@ main(int argc, char *argv[])
         connectScreen(screen);
         NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->LockScreen();)
     });
-
     NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->LockScreen();)
 
     return app.exec();
