@@ -1,9 +1,6 @@
 #include "CommandLine.h"
 #include "MediaPlayerBackend.h"
-#include <private/qwaylandinputdevice_p.h>
-#include <private/qwaylandshellintegration_p.h>
-#include <private/qwaylandwindow_p.h>
-#include <qnamespace.h>
+#include <QtWaylandClient/private/qwaylandwindow_p.h>
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
     do {                                                                                           \
