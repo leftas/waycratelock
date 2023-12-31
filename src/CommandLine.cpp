@@ -3,7 +3,7 @@
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
     do {                                                                                           \
-    } while (0)
+    } while (0);
 #else
 #define NON_DEBUG(EXP) EXP
 #include <SessionLockQt/command.h>
@@ -175,7 +175,7 @@ void
 CommandLine::errorMessage(QString message)
 {
     setErrorMessage(message);
-    QTimer::singleShot(3000, [this] { setErrorMessage(""); });
+    QTimer::singleShot(3000, this, [this] { setErrorMessage(""); });
 }
 
 void
