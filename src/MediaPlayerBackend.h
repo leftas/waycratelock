@@ -11,7 +11,7 @@
 typedef QMap<QString, QVariant> Dict;
 Q_DECLARE_METATYPE(Dict)
 
-class MediaPlayerBackend final : public QObject
+class MediaPlayerBackend : public QObject
 {
     Q_OBJECT
     QML_ELEMENT

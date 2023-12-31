@@ -4,7 +4,7 @@
 #include <QQmlEngine>
 #include <security/pam_appl.h>
 
-class PassWordInfo final : public QObject
+class PassWordInfo : public QObject
 {
     Q_OBJECT
 
