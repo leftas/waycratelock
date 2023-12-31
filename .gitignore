@@ -15,4 +15,5 @@ CMakeCache.txt
 compile_commands.json
 Makefile
 
-waycratelock_qmltyperegistrations
+waycratelock_qmltyperegistrations*
+waycratelock
