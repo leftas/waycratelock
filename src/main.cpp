@@ -1,6 +1,7 @@
 #include "CommandLine.h"
 #include "MediaPlayerBackend.h"
 #include <QtWaylandClient/private/qwaylandwindow_p.h>
+#include <QtWaylandClient/private/qwaylandinputdevice_p.h>
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
     do {                                                                                           \
@@ -47,21 +48,30 @@ main(int argc, char *argv[])
       "WayCrateLock", 1, 0, "MediaPlayerBackend", [](QQmlEngine *, QJSEngine *) -> QObject * {
           return new MediaPlayerBackend();
       });
-    auto connectScreen = [&engine, url](auto screen) -> void {
+    auto connectScreen = [&engine, url, &app](auto screen) -> void {
         engine.load(url);
         if (QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last())) {
             auto input = window->findChild<QQuickItem *>("input");
             QObject::connect(input, &QQuickItem::focusChanged, input, [input](auto focus) {
-                if (focus) {
-                    auto focusWindow = input->window();
-                    auto wFocusWindow =
-                      dynamic_cast<QtWaylandClient::QWaylandWindow *>(focusWindow->handle());
-                    wFocusWindow->display()->handleWindowActivated(wFocusWindow);
-                    if (oldWindow && oldWindow != wFocusWindow) {
-                        oldWindow->display()->handleWindowDeactivated(oldWindow);
-                    }
-                    oldWindow = wFocusWindow;
+                if (!focus) 
+                    return;
+                auto focusWindow = input->window();
+                auto wFocusWindow =
+                    dynamic_cast<QtWaylandClient::QWaylandWindow *>(focusWindow->handle());
+
+                // Change focus
+                wFocusWindow->display()->handleWindowActivated(wFocusWindow);
+                // Until Qt or compositors fix this, we have to manually set the focus
+                if (wFocusWindow->display()->defaultInputDevice() && wFocusWindow->display()->defaultInputDevice()->keyboard())
+                {
+                    wFocusWindow->display()->defaultInputDevice()->keyboard()->mFocus = wFocusWindow->waylandSurface();
                 }
+                // Remove old window from focus list.
+                if (oldWindow && oldWindow != wFocusWindow) 
+                {
+                    oldWindow->display()->handleWindowDeactivated(oldWindow);
+                }
+                oldWindow = wFocusWindow;
             });
             window->setScreen(screen);
             window->setGeometry(screen->geometry());
@@ -72,7 +82,6 @@ main(int argc, char *argv[])
             exit(0);
         }
     };
-    std::reverse(screens.begin(), screens.end());
     for (auto screen : screens) {
         connectScreen(screen);
     }

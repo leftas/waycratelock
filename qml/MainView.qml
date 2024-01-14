@@ -52,8 +52,8 @@ Page {
         hoverEnabled: true
         onEntered: {
             root.isIn = true;
-            input.focus = true;
             root.forceActiveFocus();
+            input.focus = true;
         }
         onExited: {
             root.isIn = false;
@@ -70,7 +70,7 @@ Page {
             Label {
                 text: CommandLine.currentDate
                 Layout.alignment: Qt.AlignHCenter
-                font.pointSize: root.isIn ? 30 : 35
+                font.pointSize: root.isIn ? 35 : 30
                 font.bold: true
                 Behavior on font.pointSize {
                     enabled: true
@@ -80,13 +80,55 @@ Page {
                 }
             }
 
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                Label {
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.leftPad(root.hours)
+                    font.pointSize: root.isIn ? 35 : 30
+                    font.bold: true
+                    Layout.preferredWidth: 80
+                    Behavior on font.pointSize {
+                        enabled: true
+                        SmoothedAnimation {
+                            velocity: 70
+                        }
+                    }
+                }
+                Label {
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: ":"
+                    font.pointSize: root.isIn ? 35 : 30
+                    font.bold: true
+                    Behavior on font.pointSize {
+                        enabled: true
+                        SmoothedAnimation {
+                            velocity: 70
+                        }
+                    }
+                }
+                Label {
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.leftPad(root.minutes)
+                    font.pointSize: root.isIn ? 35 : 30
+                    font.bold: true
+                    Layout.preferredWidth: 80
+                    Behavior on font.pointSize {
+                        enabled: true
+                        SmoothedAnimation {
+                            velocity: 70
+                        }
+                    }
+                }
+            }
+
             Item {
                 Layout.fillHeight: true
             }
 
-            TimePanel {
-                Layout.alignment: Qt.AlignHCenter
-            }
 
             Item {
                 Layout.preferredHeight: 30
@@ -184,51 +226,6 @@ Page {
 
             Item {
                 Layout.preferredHeight: 40
-            }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                Label {
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: root.leftPad(root.hours)
-                    font.pointSize: root.isIn ? 30 : 35
-                    font.bold: true
-                    Layout.preferredWidth: 80
-                    Behavior on font.pointSize {
-                        enabled: true
-                        SmoothedAnimation {
-                            velocity: 70
-                        }
-                    }
-                }
-                Label {
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: ":"
-                    font.pointSize: root.isIn ? 30 : 35
-                    font.bold: true
-                    Behavior on font.pointSize {
-                        enabled: true
-                        SmoothedAnimation {
-                            velocity: 70
-                        }
-                    }
-                }
-                Label {
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: root.leftPad(root.minutes)
-                    font.pointSize: root.isIn ? 30 : 35
-                    font.bold: true
-                    Layout.preferredWidth: 80
-                    Behavior on font.pointSize {
-                        enabled: true
-                        SmoothedAnimation {
-                            velocity: 70
-                        }
-                    }
-                }
             }
 
             Item {
