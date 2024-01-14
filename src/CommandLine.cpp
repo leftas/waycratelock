@@ -22,8 +22,7 @@
 #include <unistd.h>
 
 constexpr static std::string CONFIG_FILE = "setting.toml";
-
-constexpr static std::string CONFIGDIR = "waycratelock";
+constexpr static std::string CONFIGDIR   = "waycratelock";
 
 static std::mutex PAM_GUARD;
 
@@ -42,7 +41,7 @@ static PassWordInfo *PASSWORDINFO_INSTANCE = nullptr;
 enum PamStatus
 {
     PamEndFailed,
-    Successed,
+    Successful,
     Failed,
 
 };
@@ -102,7 +101,6 @@ handle_conversation(int num_msg,
 
 CommandLine::CommandLine(QObject *parent)
   : QObject(parent)
-  , m_currentDate(QLocale().toString(QDate::currentDate()))
   , m_handle(nullptr)
   , m_usePam(true)
   , m_backgroundImagePath(QUrl("qrc:/image/gangdamu.png"))
@@ -172,10 +170,11 @@ CommandLine::UnLock()
 }
 
 void
-CommandLine::errorMessage(QString message)
+CommandLine::showErrorMessage(QString message, int timeSeconds)
 {
+    setErrorMessageVisibility(true);
     setErrorMessage(message);
-    QTimer::singleShot(3000, this, [this] { setErrorMessage(""); });
+    QTimer::singleShot(timeSeconds, this, [this] { setErrorMessageVisibility(false); });
 }
 
 void
@@ -187,9 +186,11 @@ CommandLine::RequestUnlock()
     }
 
     if (m_password.isEmpty()) {
-        errorMessage("Password cannot be empty.");
+        showErrorMessage("Password cannot be empty.");
         return;
     }
+
+    setBusy(true);
 
     QtConcurrent::run([this] {
         std::lock_guard<std::mutex> guard(PAM_GUARD);
@@ -199,23 +200,21 @@ CommandLine::RequestUnlock()
         }
         pam_setcred(m_handle, PAM_REFRESH_CRED);
         if (pam_end(m_handle, pam_status)) {
-            qWarning() << "Pam end failed";
             return PamStatus::PamEndFailed;
         }
-        return PamStatus::Successed;
+        return PamStatus::Successful;
     }).then([this](PamStatus value) {
+        setBusy(false);
         switch (value) {
         case PamEndFailed: {
-            qWarning() << "Pam end failed";
-            UnLock();
-            break;
+            qWarning() << "Pam end failed!";
         }
-        case Successed: {
+        case Successful: {
             UnLock();
             break;
         }
         case Failed: {
-            errorMessage("Failed to unlock. Check your password");
+            showErrorMessage("Failed to unlock. Check your password");
             break;
         }
         }

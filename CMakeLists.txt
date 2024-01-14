@@ -51,7 +51,6 @@ qt_add_qml_module(waycratelock
     src/MediaPlayerBackend.cpp
   QML_FILES
     qml/main.qml
-    qml/TimePanel.qml
     qml/MainView.qml
 )
 
