@@ -26,9 +26,12 @@ int
 main(int argc, char *argv[])
 {
     NON_DEBUG(ExtSessionLockV1Qt::Shell::useExtSessionLock();)
+
     QGuiApplication app(argc, argv);
     QQuickStyle::setStyle("Material");
+
     auto screens = QGuiApplication::screens();
+
     const QUrl url(u"qrc:/WayCrateLock/qml/main.qml"_qs);
     QQmlApplicationEngine engine;
     QObject::connect(
@@ -49,6 +52,7 @@ main(int argc, char *argv[])
       "WayCrateLock", 1, 0, "MediaPlayerBackend", [](QQmlEngine *, QJSEngine *) -> QObject * {
           return new MediaPlayerBackend();
       });
+
     auto connectScreen = [&engine, url, &app](auto screen) -> void {
         engine.load(url);
         QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last());
@@ -60,11 +64,10 @@ main(int argc, char *argv[])
         QObject::connect(input, &QQuickItem::focusChanged, input, [input](auto focus) {
             if (!focus) 
                 return;
-
             auto focusWindow = input->window();
             auto wFocusWindow =
                 dynamic_cast<QtWaylandClient::QWaylandWindow *>(focusWindow->handle());
-
+    
             // Change focus
             wFocusWindow->display()->handleWindowActivated(wFocusWindow);
             // Until Qt or compositors fix this, we have to manually set the focus
@@ -93,6 +96,14 @@ main(int argc, char *argv[])
         NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->LockScreen();)
     });
     NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->LockScreen();)
+    QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last());
+
+    // So we could start inputing text right away
+    auto root = window->findChild<QQuickItem *>("root");
+    if (root){
+        root->setProperty("isIn", true);
+        root->forceActiveFocus();
+    }
 
     return app.exec();
 }

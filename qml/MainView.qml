@@ -5,6 +5,7 @@ import WayCrateLock
 
 Page {
     id: root
+    objectName: "root"
     anchors.fill: parent
     property bool isIn: false
     property date currentTime: new Date()
@@ -44,6 +45,8 @@ Page {
     }
 
     Keys.onPressed: {
+        root.isIn = true;
+        root.forceActiveFocus();
         input.focus = true;
     }
 
