@@ -179,6 +179,18 @@ Page {
                 }
                 onAccepted: checkPassword()
 
+                Keys.onPressed: function (event){
+                    const isRepeatAllowedKeys = (event.matches(StandardKey.Delete) ||
+                                                event.matches(StandardKey.Backspace) ||
+                                                event.matches(StandardKey.MoveToPreviousChar) ||
+                                                event.matches(StandardKey.MoveToNextChar) ||
+                                                event.key == Qt.Key_Backspace);
+
+                    if (event.isAutoRepeat && !isRepeatAllowedKeys)
+                    {
+                        event.accepted = true;
+                    }
+                }
                 Keys.onEscapePressed: {
                     focus = false;
                 }
