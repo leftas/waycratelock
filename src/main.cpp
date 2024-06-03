@@ -3,6 +3,7 @@
 #include <QtWaylandClient/private/qwaylandwindow_p.h>
 #include <QtWaylandClient/private/qwaylandsurface_p.h>
 #include <QtWaylandClient/private/qwaylandinputdevice_p.h>
+#include <qnamespace.h>
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
     do {                                                                                           \
@@ -29,6 +30,7 @@ main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     QQuickStyle::setStyle("Material");
+
 
     auto screens = QGuiApplication::screens();
 
@@ -60,6 +62,12 @@ main(int argc, char *argv[])
             qDebug() << "Cannot get window";
             exit(0);
         }
+
+        QSurfaceFormat surfFormat;
+        surfFormat.setAlphaBufferSize(8);
+        window->setFormat(surfFormat);
+        window->setColor(QColor(Qt::transparent));
+
         auto input = window->findChild<QQuickItem *>("input");
         QObject::connect(input, &QQuickItem::focusChanged, input, [input](auto focus) {
             if (!focus) 

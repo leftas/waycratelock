@@ -28,6 +28,13 @@ Page {
         fillMode: Image.PreserveAspectCrop
         source: CommandLine.background
         opacity: CommandLine.opacity
+
+        NumberAnimation on opacity {
+            from: 0
+            to: CommandLine.opacity
+            duration: 1000
+            running: true
+        }
     }
 
     Item {
