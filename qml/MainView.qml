@@ -9,7 +9,8 @@ Page {
     anchors.fill: parent
     property bool isIn: false
     property date currentTime: new Date()
-    property bool busy: CommandLine.busy
+    property bool busy: Commandline.busy
+    property bool exiting: Commandline.exiting
 
     function leftPad(number) {
         var output = number + '';
@@ -20,21 +21,54 @@ Page {
     }
 
     function checkPassword() {
-        CommandLine.RequestUnlock();
+        Commandline.requestUnlock();
     }
 
     background: Image {
+        id: img
         anchors.fill: root
         fillMode: Image.PreserveAspectCrop
-        source: CommandLine.background
-        opacity: CommandLine.opacity
+        source: Commandline.background
 
         NumberAnimation on opacity {
             from: 0
-            to: CommandLine.opacity
-            duration: 1000
+            to: Commandline.opacity
+            duration: Commandline.fadeIn
             running: true
         }
+
+
+        states: [
+            State {
+                name: "Invisible"
+                when: root.exiting
+                PropertyChanges {
+                    target: img
+                    opacity: 0.0
+                }
+                PropertyChanges {
+                    target: img
+                    visible: false
+                }
+            }
+        ]
+
+        transitions: [
+            Transition {
+                to: "Invisible"
+
+                SequentialAnimation {
+                    NumberAnimation {
+                        property: "opacity"
+                        duration: Commandline.fadeOut
+                    }
+                    NumberAnimation {
+                        property: "visible"
+                        duration: 0
+                    }
+                }
+            }
+        ]
     }
 
     Item {
@@ -179,10 +213,10 @@ Page {
                 Layout.alignment: Qt.AlignHCenter
 
                 enabled: !root.busy
-                text: CommandLine.password
+                text: Commandline.password
                 placeholderText: "Password"
                 onEditingFinished: {
-                    CommandLine.password = input.text;
+                    Commandline.password = input.text;
                 }
                 onAccepted: checkPassword()
 
@@ -279,74 +313,50 @@ Page {
                 }
             }
 
-            Label {
-                id: errorLabel
-                text: CommandLine.errorMessage
+            ListView {
+                id: list
+                readonly property int itemPadding: 4
+                readonly property TextMetrics tm: TextMetrics { text: "#" }
+                readonly property int itemHeight: tm.height + itemPadding * 2
+                readonly property int maxItems: 4
+                Layout.minimumWidth: 250
                 Layout.alignment: Qt.AlignHCenter
-                font.pointSize: 15
-                color: "red"
-                font.bold: true
-
-                states: [
-                    State {
-                        when: CommandLine.errorMessageVisible && root.isIn
-                        name: "Visible"
-                        PropertyChanges {
-                            target: errorLabel
-                            opacity: 1.0
+                Layout.minimumHeight: itemHeight
+                Layout.maximumHeight: itemHeight * maxItems
+                model: Commandline.messages
+                delegate: Item {
+                    required property string message
+                    required property bool error
+                    width: list.width
+                    height: list.itemHeight
+                    Frame {
+                        width: list.width
+                        height: parent.height
+                        padding: 0
+                        background: Rectangle {
+                            color: error ? "red" : "yellow"
+                            radius: 25
                         }
-                        PropertyChanges {
-                            target: errorLabel
-                            visible: true
-                        }
-                    },
-                    State {
-                        name: "Invisible"
-                        when: !(CommandLine.errorMessageVisible && root.isIn)
-                        PropertyChanges {
-                            target: errorLabel
-                            opacity: 0.0
-                        }
-                        PropertyChanges {
-                            target: errorLabel
-                            visible: false
+                        Label {
+                            id: itemLabel
+                            anchors.centerIn: parent
+                            color: "black"
+                            text: message
                         }
                     }
-                ]
+                }
+                add: Transition {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1.0; duration: 400 }
+                    NumberAnimation { property: "scale"; from: 0; to: 1.0; duration: 400 }
+                }
+                remove: Transition {
+                    NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 400 }
+                    NumberAnimation { property: "scale"; from: 1; to: 0; duration: 400 }
+                }
 
-                transitions: [
-                    Transition {
-                        from: "Visible"
-                        to: "Invisible"
-
-                        SequentialAnimation {
-                            NumberAnimation {
-                                property: "opacity"
-                                duration: 500
-                                easing.type: Easing.InOutQuad
-                            }
-                            NumberAnimation {
-                                property: "visible"
-                                duration: 0
-                            }
-                        }
-                    },
-                    Transition {
-                        from: "Invisible"
-                        to: "Visible"
-                        SequentialAnimation {
-                            NumberAnimation {
-                                property: "visible"
-                                duration: 0
-                            }
-                            NumberAnimation {
-                                property: "opacity"
-                                duration: 500
-                                easing.type: Easing.InOutQuad
-                            }
-                        }
-                    }
-                ]
+                displaced: Transition {
+                    NumberAnimation { properties: "x,y"; duration: 400; easing.type: Easing.OutBounce }
+                }
             }
 
             BusyIndicator {

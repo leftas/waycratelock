@@ -1,4 +1,6 @@
-#include "CommandLine.h"
+#include "Commandline.h"
+#include <qlogging.h>
+#include <qnamespace.h>
 
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
@@ -21,7 +23,7 @@
 #include <toml++/toml.h>
 #include <unistd.h>
 
-constexpr static std::string CONFIG_FILE = "setting.toml";
+constexpr static std::string CONFIG_FILE = "config.toml";
 constexpr static std::string CONFIGDIR   = "waycratelock";
 
 static std::mutex PAM_GUARD;
@@ -36,7 +38,7 @@ get_config_path()
                   CONFIG_FILE));
 }
 
-static PassWordInfo *PASSWORDINFO_INSTANCE = nullptr;
+static PasswordInfo *PASSWORDINFO_INSTANCE = nullptr;
 
 enum PamStatus
 {
@@ -46,25 +48,80 @@ enum PamStatus
 
 };
 
-PassWordInfo::PassWordInfo(QObject *parent)
+PasswordInfo::PasswordInfo(QObject *parent)
   : QObject(parent)
   , m_password(QString())
 {
 }
 
-PassWordInfo *
-PassWordInfo::instance()
+PasswordInfo *
+PasswordInfo::instance()
 {
     if (!PASSWORDINFO_INSTANCE) {
-        PASSWORDINFO_INSTANCE = new PassWordInfo;
+        PASSWORDINFO_INSTANCE = new PasswordInfo;
     }
     return PASSWORDINFO_INSTANCE;
 }
 
 void
-PassWordInfo::setPassword(const QString &password)
+PasswordInfo::setPassword(const QString &password)
 {
     m_password = password;
+}
+
+MessageModel::MessageModel(QObject *parent)
+  : QAbstractListModel(parent)
+{
+}
+
+void
+MessageModel::addMessage(const Message &message)
+{
+    beginInsertRows(QModelIndex(), rowCount(), rowCount());
+    m_messages << message;
+    endInsertRows();
+}
+
+void
+MessageModel::removeMessage(const Message &message)
+{
+    auto idx = m_messages.indexOf(message);
+    if (idx >= 0) {
+        beginRemoveRows(QModelIndex(), idx, idx);
+        m_messages.removeAt(idx);
+        endRemoveRows();
+    }
+}
+
+int
+MessageModel::rowCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent);
+    return m_messages.count();
+}
+
+QVariant
+MessageModel::data(const QModelIndex &index, int role) const
+{
+    if (index.row() < 0 || index.row() >= m_messages.count())
+        return QVariant();
+
+    const Message &message = m_messages[index.row()];
+    if (role == MessageRole)
+        return QVariant::fromValue(message.message());
+    else if (role == ErrorRole)
+        return QVariant::fromValue(message.error());
+    return QVariant();
+}
+
+//![0]
+QHash<int, QByteArray>
+MessageModel::roleNames() const
+{
+    QHash<int, QByteArray> roles;
+    roles[MessageRole] = "message";
+    roles[ErrorRole]   = "error";
+    return roles;
 }
 
 static int
@@ -74,6 +131,7 @@ handle_conversation(int num_msg,
                     void *data)
 {
     /* PAM expects an array of responses, one for each message */
+    auto thisptr = static_cast<Commandline *>(data);
     struct pam_response *pam_reply =
       static_cast<struct pam_response *>(calloc(num_msg, sizeof(struct pam_response)));
     if (pam_reply == NULL) {
@@ -85,46 +143,47 @@ handle_conversation(int num_msg,
         case PAM_PROMPT_ECHO_OFF:
         case PAM_PROMPT_ECHO_ON:
             pam_reply[i].resp =
-              strdup(PassWordInfo::instance()->password().toLocal8Bit().data()); // PAM clears and
+              strdup(PasswordInfo::instance()->password().toLocal8Bit().data()); // PAM clears and
                                                                                  // frees this
             if (pam_reply[i].resp == NULL) {
                 return PAM_ABORT;
             }
             break;
         case PAM_ERROR_MSG:
+            thisptr->showTimedMessage(msg[i]->msg, true);
         case PAM_TEXT_INFO:
+            thisptr->showTimedMessage(msg[i]->msg, false, 6000);
             break;
         }
     }
     return PAM_SUCCESS;
 }
 
-CommandLine::CommandLine(QObject *parent)
+Commandline::Commandline(QObject *parent)
   : QObject(parent)
-  , m_handle(nullptr)
   , m_usePam(true)
   , m_backgroundImagePath(QUrl("qrc:/image/gangdamu.png"))
-  , m_opacity(0.6)
+  , m_opacity(1)
 {
-    m_userName = QString::fromStdString(getlogin());
+    m_username = QString::fromStdString(getlogin());
     readConfig();
     if (!m_usePam) {
         return;
     }
     const struct pam_conv conv = {
       .conv        = &handle_conversation,
-      .appdata_ptr = NULL,
+      .appdata_ptr = this,
     };
-    if (pam_start("waycratelock", m_userName.toLocal8Bit().data(), &conv, &m_handle) !=
+    if (pam_start("waycratelock", m_username.toLocal8Bit().data(), &conv, &m_handle) !=
         PAM_SUCCESS) {
         qWarning() << "Cannot start pam";
-        QTimer::singleShot(0, this, [this] { this->UnLock(); });
+        QTimer::singleShot(0, this, [this] { this->unlock(); });
         return;
     }
 }
 
 void
-CommandLine::readConfig()
+Commandline::readConfig()
 {
     QString configpath = get_config_path();
     if (!QFile(configpath).exists()) {
@@ -132,11 +191,15 @@ CommandLine::readConfig()
     }
     try {
         auto tbl                              = toml::parse_file(configpath.toStdString());
-        std::optional<bool> usePam            = tbl["needPassword"].value<bool>();
+        std::optional<bool> usePam            = tbl["general"]["needPassword"].value<bool>();
         std::optional<std::string> background = tbl["background"]["path"].value<std::string>();
         std::optional<double> opacity         = tbl["background"]["opacity"].value<float>();
+        std::optional<int> fadeIn             = tbl["background"]["fadein"].value<int>();
+        std::optional<int> fadeOut            = tbl["background"]["fadeout"].value<int>();
         m_opacity                             = opacity.value_or(1);
         m_usePam                              = usePam.value_or(true);
+        m_fadeIn                              = fadeIn.value_or(0);
+        m_fadeOut                             = fadeOut.value_or(0);
         if (background.has_value()) {
             QString backgroundPath = QString::fromStdString(background.value());
             if (backgroundPath.startsWith("~")) {
@@ -150,43 +213,41 @@ CommandLine::readConfig()
             }
         }
     } catch (const toml::parse_error &err) {
-        m_errorMessage = "Something error with config file";
+        showTimedMessage("Something error with config file", true);
+        qWarning() << err.what();
     }
 }
 
 void
-CommandLine::setPassword(const QString &password)
+Commandline::setPassword(const QString &password)
 {
     m_password = password;
-    PassWordInfo::instance()->setPassword(password);
+    PasswordInfo::instance()->setPassword(password);
     Q_EMIT passwordChanged();
 }
 
 void
-CommandLine::UnLock()
+Commandline::unlock()
 {
-    NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->unLockScreen();)
-    QTimer::singleShot(0, qApp, [] { QGuiApplication::quit(); });
+    setExiting(true);
+    QTimer::singleShot(
+      fadeOut(), qApp, [] { NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->unlockScreen();) });
+    QTimer::singleShot(fadeOut() + 1, qApp, [] { QGuiApplication::quit(); });
 }
 
 void
-CommandLine::showErrorMessage(QString message, int timeSeconds)
+Commandline::showTimedMessage(QString message, bool error, int timeSeconds)
 {
-    setErrorMessageVisibility(true);
-    setErrorMessage(message);
-    QTimer::singleShot(timeSeconds, this, [this] { setErrorMessageVisibility(false); });
+    auto msg = Message(message, error);
+    messages()->addMessage(msg);
+    QTimer::singleShot(timeSeconds, this, [this, msg] { messages()->removeMessage(msg); });
 }
 
 void
-CommandLine::RequestUnlock()
+Commandline::requestUnlock()
 {
     if (!m_usePam) {
-        UnLock();
-        return;
-    }
-
-    if (m_password.isEmpty()) {
-        showErrorMessage("Password cannot be empty.");
+        unlock();
         return;
     }
 
@@ -199,7 +260,7 @@ CommandLine::RequestUnlock()
             return PamStatus::Failed;
         }
         pam_setcred(m_handle, PAM_REFRESH_CRED);
-        if (pam_end(m_handle, pam_status)) {
+        if (pam_end(m_handle, pam_status) != PAM_SUCCESS) {
             return PamStatus::PamEndFailed;
         }
         return PamStatus::Successful;
@@ -207,14 +268,14 @@ CommandLine::RequestUnlock()
         setBusy(false);
         switch (value) {
         case PamEndFailed: {
-            qWarning() << "Pam end failed!";
+            showTimedMessage("Pam end failed!", true);
         }
         case Successful: {
-            UnLock();
+            unlock();
             break;
         }
         case Failed: {
-            showErrorMessage("Failed to unlock. Check your password");
+            showTimedMessage("Failed to unlock. Check your password", true);
             break;
         }
         }

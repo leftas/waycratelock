@@ -45,8 +45,8 @@ qt_add_qml_module(waycratelock
   URI WayCrateLock
   VERSION 1.0
   SOURCES
-    src/CommandLine.h
-    src/CommandLine.cpp
+    src/Commandline.h
+    src/Commandline.cpp
     src/MediaPlayerBackend.h
     src/MediaPlayerBackend.cpp
   QML_FILES
