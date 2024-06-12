@@ -154,10 +154,10 @@ private:
     MessageModel* m_messages = new MessageModel;
     pam_handle_t *m_handle;
     bool m_usePam;
-    bool m_busy;
+    bool m_busy = false;
     QUrl m_backgroundImagePath;
     double m_opacity;
-    bool m_exiting;
+    bool m_exiting = false;
     int m_fadeIn;
     int m_fadeOut;
 };

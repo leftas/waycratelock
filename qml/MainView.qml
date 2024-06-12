@@ -24,51 +24,52 @@ Page {
         Commandline.requestUnlock();
     }
 
+    NumberAnimation on opacity {
+        from: 0
+        to: Commandline.opacity
+        duration: Commandline.fadeIn
+        running: true
+    }
+
+
+    states: [
+        State {
+            name: "Invisible"
+            when: root.exiting
+            PropertyChanges {
+                target: root
+                opacity: 0.0
+            }
+            PropertyChanges {
+                target: root
+                visible: false
+            }
+        }
+    ]
+
+    transitions: [
+        Transition {
+            to: "Invisible"
+
+            SequentialAnimation {
+                NumberAnimation {
+                    property: "opacity"
+                    duration: Commandline.fadeOut
+                }
+                NumberAnimation {
+                    property: "visible"
+                    duration: 0
+                }
+            }
+        }
+    ]
+
     background: Image {
         id: img
         anchors.fill: root
         fillMode: Image.PreserveAspectCrop
         source: Commandline.background
 
-        NumberAnimation on opacity {
-            from: 0
-            to: Commandline.opacity
-            duration: Commandline.fadeIn
-            running: true
-        }
-
-
-        states: [
-            State {
-                name: "Invisible"
-                when: root.exiting
-                PropertyChanges {
-                    target: img
-                    opacity: 0.0
-                }
-                PropertyChanges {
-                    target: img
-                    visible: false
-                }
-            }
-        ]
-
-        transitions: [
-            Transition {
-                to: "Invisible"
-
-                SequentialAnimation {
-                    NumberAnimation {
-                        property: "opacity"
-                        duration: Commandline.fadeOut
-                    }
-                    NumberAnimation {
-                        property: "visible"
-                        duration: 0
-                    }
-                }
-            }
-        ]
     }
 
     Item {
