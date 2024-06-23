@@ -1,4 +1,5 @@
 #include "Commandline.h"
+#include <glob.h>
 #include <qlogging.h>
 #include <qnamespace.h>
 
@@ -74,56 +75,6 @@ MessageModel::MessageModel(QObject *parent)
 {
 }
 
-void
-MessageModel::addMessage(const Message &message)
-{
-    beginInsertRows(QModelIndex(), rowCount(), rowCount());
-    m_messages << message;
-    endInsertRows();
-}
-
-void
-MessageModel::removeMessage(const Message &message)
-{
-    auto idx = m_messages.indexOf(message);
-    if (idx >= 0) {
-        beginRemoveRows(QModelIndex(), idx, idx);
-        m_messages.removeAt(idx);
-        endRemoveRows();
-    }
-}
-
-int
-MessageModel::rowCount(const QModelIndex &parent) const
-{
-    Q_UNUSED(parent);
-    return m_messages.count();
-}
-
-QVariant
-MessageModel::data(const QModelIndex &index, int role) const
-{
-    if (index.row() < 0 || index.row() >= m_messages.count())
-        return QVariant();
-
-    const Message &message = m_messages[index.row()];
-    if (role == MessageRole)
-        return QVariant::fromValue(message.message());
-    else if (role == ErrorRole)
-        return QVariant::fromValue(message.error());
-    return QVariant();
-}
-
-//![0]
-QHash<int, QByteArray>
-MessageModel::roleNames() const
-{
-    QHash<int, QByteArray> roles;
-    roles[MessageRole] = "message";
-    roles[ErrorRole]   = "error";
-    return roles;
-}
-
 static int
 handle_conversation(int num_msg,
                     const struct pam_message **msg,
@@ -182,6 +133,20 @@ Commandline::Commandline(QObject *parent)
     }
 }
 
+QString
+Commandline::parsePath(const QString &string)
+{
+    glob_t globbuf;
+    if (glob(string.toStdString().c_str(), GLOB_TILDE, NULL, &globbuf) == 0) {
+        if (globbuf.gl_pathc > 0) {
+            auto result = QString(globbuf.gl_pathv[0]);
+            globfree(&globbuf);
+            return result;
+        }
+    }
+    return QString();
+}
+
 void
 Commandline::readConfig()
 {
@@ -196,21 +161,15 @@ Commandline::readConfig()
         std::optional<double> opacity         = tbl["background"]["opacity"].value<float>();
         std::optional<int> fadeIn             = tbl["background"]["fadein"].value<int>();
         std::optional<int> fadeOut            = tbl["background"]["fadeout"].value<int>();
-        m_opacity                             = opacity.value_or(1);
-        m_usePam                              = usePam.value_or(true);
-        m_fadeIn                              = fadeIn.value_or(0);
-        m_fadeOut                             = fadeOut.value_or(0);
+
+        m_opacity = opacity.value_or(1);
+        m_usePam  = usePam.value_or(true);
+        m_fadeIn  = fadeIn.value_or(0);
+        m_fadeOut = fadeOut.value_or(0);
+
         if (background.has_value()) {
-            QString backgroundPath = QString::fromStdString(background.value());
-            if (backgroundPath.startsWith("~")) {
-                backgroundPath.remove(0, 1);
-                QString home          = QDir::homePath();
-                backgroundPath        = QString("%1/%2").arg(home).arg(backgroundPath);
-                m_backgroundImagePath = QUrl::fromLocalFile(backgroundPath);
-            } else {
-                m_backgroundImagePath =
-                  QUrl::fromLocalFile(QString::fromStdString(background.value()));
-            }
+            auto backgroundImg    = parsePath(QString::fromStdString(background.value()));
+            m_backgroundImagePath = QUrl::fromLocalFile(backgroundImg);
         }
     } catch (const toml::parse_error &err) {
         showTimedMessage("Something error with config file", true);
