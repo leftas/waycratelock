@@ -1,5 +1,10 @@
 #include "MessageModel.hpp"
 
+MessageModel::MessageModel(QObject *parent)
+  : QAbstractListModel(parent)
+{
+}
+
 void
 MessageModel::addMessage(const Message &message)
 {

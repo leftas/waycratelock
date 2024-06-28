@@ -39,41 +39,13 @@ get_config_path()
                   CONFIG_FILE));
 }
 
-static PasswordInfo *PASSWORDINFO_INSTANCE = nullptr;
-
 enum PamStatus
 {
-    PamEndFailed,
+    PamFailed,
     Successful,
-    Failed,
+    AuthFailed,
 
 };
-
-PasswordInfo::PasswordInfo(QObject *parent)
-  : QObject(parent)
-  , m_password(QString())
-{
-}
-
-PasswordInfo *
-PasswordInfo::instance()
-{
-    if (!PASSWORDINFO_INSTANCE) {
-        PASSWORDINFO_INSTANCE = new PasswordInfo;
-    }
-    return PASSWORDINFO_INSTANCE;
-}
-
-void
-PasswordInfo::setPassword(const QString &password)
-{
-    m_password = password;
-}
-
-MessageModel::MessageModel(QObject *parent)
-  : QAbstractListModel(parent)
-{
-}
 
 static int
 handle_conversation(int num_msg,
@@ -83,19 +55,20 @@ handle_conversation(int num_msg,
 {
     /* PAM expects an array of responses, one for each message */
     auto thisptr = static_cast<Commandline *>(data);
+
     struct pam_response *pam_reply =
       static_cast<struct pam_response *>(calloc(num_msg, sizeof(struct pam_response)));
-    if (pam_reply == NULL) {
+    if (pam_reply == nullptr) {
         return PAM_ABORT;
     }
+
     *resp = pam_reply;
     for (int i = 0; i < num_msg; ++i) {
         switch (msg[i]->msg_style) {
         case PAM_PROMPT_ECHO_OFF:
         case PAM_PROMPT_ECHO_ON:
-            pam_reply[i].resp =
-              strdup(PasswordInfo::instance()->password().toLocal8Bit().data()); // PAM clears and
-                                                                                 // frees this
+            pam_reply[i].resp = strdup(thisptr->password().toLocal8Bit().data()); // PAM clears and
+                                                                                  // frees this
             if (pam_reply[i].resp == NULL) {
                 return PAM_ABORT;
             }
@@ -136,15 +109,15 @@ Commandline::Commandline(QObject *parent)
 QString
 Commandline::parsePath(const QString &string)
 {
+    QString result;
     glob_t globbuf;
     if (glob(string.toStdString().c_str(), GLOB_TILDE, NULL, &globbuf) == 0) {
         if (globbuf.gl_pathc > 0) {
-            auto result = QString(globbuf.gl_pathv[0]);
-            globfree(&globbuf);
-            return result;
+            result = QString(globbuf.gl_pathv[0]);
         }
     }
-    return QString();
+    globfree(&globbuf);
+    return result;
 }
 
 void
@@ -181,7 +154,6 @@ void
 Commandline::setPassword(const QString &password)
 {
     m_password = password;
-    PasswordInfo::instance()->setPassword(password);
     Q_EMIT passwordChanged();
 }
 
@@ -216,24 +188,24 @@ Commandline::requestUnlock()
         std::lock_guard<std::mutex> guard(PAM_GUARD);
         int pam_status = pam_authenticate(m_handle, 0);
         if (pam_status != PAM_SUCCESS) {
-            return PamStatus::Failed;
+            return PamStatus::AuthFailed;
         }
         pam_setcred(m_handle, PAM_REFRESH_CRED);
         if (pam_end(m_handle, pam_status) != PAM_SUCCESS) {
-            return PamStatus::PamEndFailed;
+            return PamStatus::PamFailed;
         }
         return PamStatus::Successful;
     }).then([this](PamStatus value) {
         setBusy(false);
         switch (value) {
-        case PamEndFailed: {
+        case PamFailed: {
             showTimedMessage("Pam end failed!", true);
         }
         case Successful: {
             unlock();
             break;
         }
-        case Failed: {
+        case AuthFailed: {
             showTimedMessage("Failed to unlock. Check your password", true);
             break;
         }

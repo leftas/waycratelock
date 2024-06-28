@@ -1,29 +1,10 @@
 #pragma once
 
+#include <MessageModel.hpp>
 #include <QObject>
 #include <QQmlEngine>
 #include <qabstractitemmodel.h>
 #include <security/pam_appl.h>
-#include <MessageModel.hpp>
-
-
-class PasswordInfo : public QObject
-{
-    Q_OBJECT
-
-public:
-    static PasswordInfo *instance();
-
-    inline QString password() { return m_password; }
-
-    void setPassword(const QString &password);
-
-private:
-    explicit PasswordInfo(QObject *parent = nullptr);
-
-private:
-    QString m_password;
-};
 
 class Commandline final : public QObject
 {
@@ -41,8 +22,8 @@ public:
     Q_PROPERTY(QString username READ username NOTIFY usernameChanged)
     inline QString username() { return m_username; }
 
-    Q_PROPERTY(MessageModel* messages READ messages NOTIFY messagesChanged)
-    inline MessageModel* messages() { return m_messages; }
+    Q_PROPERTY(MessageModel *messages READ messages NOTIFY messagesChanged)
+    inline MessageModel *messages() { return m_messages; }
 
     Q_PROPERTY(bool usePam READ usePam NOTIFY usePamChanged)
     inline bool usePam() { return m_usePam; }
@@ -72,7 +53,7 @@ public:
 
 private:
     void readConfig();
-    QString parsePath(const QString& command);
+    QString parsePath(const QString &command);
 
     void setBusy(bool value)
     {
@@ -99,16 +80,16 @@ signals:
     void fadeOutChanged();
 
 private:
+    MessageModel *m_messages = new MessageModel;
     QString m_currentDate;
     QString m_password;
     QString m_username;
-    MessageModel* m_messages = new MessageModel;
     pam_handle_t *m_handle;
-    bool m_usePam;
-    bool m_busy = false;
     QUrl m_backgroundImagePath;
     double m_opacity;
-    bool m_exiting = false;
     int m_fadeIn;
     int m_fadeOut;
+    bool m_usePam;
+    bool m_busy              = false;
+    bool m_exiting           = false;
 };
