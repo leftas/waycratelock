@@ -76,6 +76,9 @@ main(int argc, char *argv[])
             auto focusWindow = input->window();
             auto wFocusWindow =
               dynamic_cast<QtWaylandClient::QWaylandWindow *>(focusWindow->handle());
+            
+            if (!wFocusWindow || !wFocusWindow->display())
+                return;
 
             // Change focus
             wFocusWindow->display()->handleWindowActivated(wFocusWindow);
@@ -107,11 +110,11 @@ main(int argc, char *argv[])
     QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last());
 
     // So we could start inputting text right away
-    auto root = window->findChild<QQuickItem *>("root");
-    if (root) {
-        root->setProperty("isIn", true);
-        root->forceActiveFocus();
-    }
+    // auto root = window->findChild<QQuickItem *>("root");
+    // if (root) {
+    //     root->setProperty("isIn", true);
+    //     root->forceActiveFocus();
+    // }
 
     return app.exec();
 }
