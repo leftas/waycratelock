@@ -11,13 +11,12 @@
 typedef QMap<QString, QVariant> Dict;
 Q_DECLARE_METATYPE(Dict)
 
-class MediaPlayerBackend : public QObject
-{
+class MediaPlayerBackend : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
-public:
-    explicit MediaPlayerBackend(QObject *parent = nullptr);
+  public:
+    explicit MediaPlayerBackend(QObject* parent = nullptr);
 
     Q_PROPERTY(bool hasMedia READ hasMedia NOTIFY hasMediaChanged)
     inline bool hasMedia() { return !m_service.isEmpty(); }
@@ -45,7 +44,7 @@ public:
     Q_INVOKABLE void goPre();
     Q_INVOKABLE void goNext();
 
-signals:
+  signals:
     void hasMediaChanged();
     void canPlayChanged();
     void CanPauseChanged();
@@ -54,18 +53,18 @@ signals:
     void currentDisplayNameChanged();
     void playbackStatusChanged();
 
-    void serviceDeleted(const QString &server);
+    void serviceDeleted(const QString& server);
 
     void requestPlay();
     void requestPause();
     void requestGoPre();
     void requestGoNext();
 
-private:
+  private:
     void initMediaPlayer();
-    void initSignalServer(const QString &serverPath);
+    void initSignalServer(const QString& serverPath);
 
-private:
+  private:
     QString m_service;
     bool m_canPlay;
     bool m_canGoNext;
@@ -75,44 +74,36 @@ private:
     QString m_playBackStatus;
 };
 
-class MediaPlayerInterface : public QDBusAbstractInterface
-{
+class MediaPlayerInterface : public QDBusAbstractInterface {
     Q_OBJECT
 
-public:
-    MediaPlayerInterface(const QString &service,
-                         const QString &path,
-                         const QDBusConnection &connection,
-                         QObject *parent = nullptr);
+  public:
+    MediaPlayerInterface(const QString& service, const QString& path,
+                         const QDBusConnection& connection, QObject* parent = nullptr);
     ~MediaPlayerInterface();
 
-public:
-    inline QDBusPendingReply<> Play()
-    {
+  public:
+    inline QDBusPendingReply<> Play() {
         QList<QVariant> argumentList;
         return asyncCallWithArgumentList(QStringLiteral("Play"), argumentList);
     }
 
-    inline QDBusPendingReply<> Stop()
-    {
+    inline QDBusPendingReply<> Stop() {
         QList<QVariant> argumentList;
         return asyncCallWithArgumentList(QStringLiteral("Stop"), argumentList);
     }
 
-    inline QDBusPendingReply<> Pause()
-    {
+    inline QDBusPendingReply<> Pause() {
         QList<QVariant> argumentList;
         return asyncCallWithArgumentList(QStringLiteral("Pause"), argumentList);
     }
 
-    inline QDBusPendingReply<> Next()
-    {
+    inline QDBusPendingReply<> Next() {
         QList<QVariant> argumentList;
         return asyncCallWithArgumentList(QStringLiteral("Next"), argumentList);
     }
 
-    inline QDBusPendingReply<> Previous()
-    {
+    inline QDBusPendingReply<> Previous() {
         QList<QVariant> argumentList;
         return asyncCallWithArgumentList(QStringLiteral("Previous"), argumentList);
     }
@@ -133,12 +124,11 @@ public:
     inline bool canPause() const { return qvariant_cast<bool>(property("CanPause")); }
 
     Q_PROPERTY(QString PlaybackStatus READ playbackStatus NOTIFY PlaybackStatusChanged)
-    inline QString playbackStatus() const
-    {
+    inline QString playbackStatus() const {
         return qvariant_cast<QString>(property("PlaybackStatus"));
     }
 
-Q_SIGNALS:
+  Q_SIGNALS:
     void MetadataChanged();
     void CanPlayChanged();
     void CanGoNextChanged();
@@ -146,6 +136,6 @@ Q_SIGNALS:
     void CanPauseChanged();
     void PlaybackStatusChanged();
 
-private Q_SLOTS:
-    void onPropertyChanged(const QDBusMessage &msg);
+  private Q_SLOTS:
+    void onPropertyChanged(const QDBusMessage& msg);
 };

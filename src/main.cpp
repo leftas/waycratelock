@@ -21,11 +21,9 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 
-QtWaylandClient::QWaylandWindow *oldWindow = nullptr;
+QtWaylandClient::QWaylandWindow* oldWindow = nullptr;
 
-int
-main(int argc, char *argv[])
-{
+int main(int argc, char* argv[]) {
     NON_DEBUG(ExtSessionLockV1Qt::Shell::useExtSessionLock();)
 
     QGuiApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
@@ -41,27 +39,23 @@ main(int argc, char *argv[])
     const QUrl url(u"qrc:/WayCrateLock/qml/main.qml"_qs);
     QQmlApplicationEngine engine;
     QObject::connect(
-      &engine,
-      &QQmlApplicationEngine::objectCreated,
-      &app,
-      [url](QObject *obj, const QUrl &objUrl) {
-          if (!obj && url == objUrl)
-              QCoreApplication::exit(-1);
-      },
-      Qt::QueuedConnection);
+        &engine, &QQmlApplicationEngine::objectCreated, &app,
+        [url](QObject* obj, const QUrl& objUrl) {
+            if (!obj && url == objUrl)
+                QCoreApplication::exit(-1);
+        },
+        Qt::QueuedConnection);
 
     qmlRegisterSingletonType<Commandline>(
-      "WayCrateLock", 1, 0, "Commandline", [](QQmlEngine *, QJSEngine *) -> QObject * {
-          return new Commandline();
-      });
+        "WayCrateLock", 1, 0, "Commandline",
+        [](QQmlEngine*, QJSEngine*) -> QObject* { return new Commandline(); });
     qmlRegisterSingletonType<MediaPlayerBackend>(
-      "WayCrateLock", 1, 0, "MediaPlayerBackend", [](QQmlEngine *, QJSEngine *) -> QObject * {
-          return new MediaPlayerBackend();
-      });
+        "WayCrateLock", 1, 0, "MediaPlayerBackend",
+        [](QQmlEngine*, QJSEngine*) -> QObject* { return new MediaPlayerBackend(); });
 
     auto connectScreen = [&engine, url, &app](auto screen) -> void {
         engine.load(url);
-        QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last());
+        QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().last());
         if (!window) {
             qDebug() << "Cannot get window";
             exit(0);
@@ -69,14 +63,14 @@ main(int argc, char *argv[])
 
         window->setColor(QColor(Qt::transparent));
 
-        auto input = window->findChild<QQuickItem *>("input");
+        auto input = window->findChild<QQuickItem*>("input");
         QObject::connect(input, &QQuickItem::focusChanged, input, [input](auto focus) {
             if (!focus)
                 return;
             auto focusWindow = input->window();
             auto wFocusWindow =
-              dynamic_cast<QtWaylandClient::QWaylandWindow *>(focusWindow->handle());
-            
+                dynamic_cast<QtWaylandClient::QWaylandWindow*>(focusWindow->handle());
+
             if (!wFocusWindow || !wFocusWindow->display())
                 return;
 
@@ -86,7 +80,7 @@ main(int argc, char *argv[])
             if (wFocusWindow->display()->defaultInputDevice() &&
                 wFocusWindow->display()->defaultInputDevice()->keyboard()) {
                 wFocusWindow->display()->defaultInputDevice()->keyboard()->mFocus =
-                  wFocusWindow->waylandSurface();
+                    wFocusWindow->waylandSurface();
             }
             // Remove old window from focus list.
             if (oldWindow && oldWindow != wFocusWindow) {
@@ -107,7 +101,7 @@ main(int argc, char *argv[])
         NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->lockScreen();)
     });
     NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->lockScreen();)
-    QQuickWindow *window = qobject_cast<QQuickWindow *>(engine.rootObjects().last());
+    QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().last());
 
     // So we could start inputting text right away
     // auto root = window->findChild<QQuickItem *>("root");

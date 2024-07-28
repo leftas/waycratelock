@@ -6,64 +6,50 @@
 #include <QMetaProperty>
 #include <qdbuspendingcall.h>
 
-MediaPlayerBackend::MediaPlayerBackend(QObject *parent)
-  : QObject(parent)
-  , m_service(QString())
-  , m_canPlay(false)
-  , m_canPause(false)
-  , m_canGoNext(false)
-  , m_canGoPre(false)
-  , m_currentDisplayName(QString())
-  , m_playBackStatus(QString())
-{
+MediaPlayerBackend::MediaPlayerBackend(QObject* parent)
+    : QObject(parent), m_service(QString()), m_canPlay(false), m_canPause(false),
+      m_canGoNext(false), m_canGoPre(false), m_currentDisplayName(QString()),
+      m_playBackStatus(QString()) {
     initMediaPlayer();
 }
 
-void
-MediaPlayerBackend::initMediaPlayer()
-{
-    QDBusConnectionInterface *interface = QDBusConnection::sessionBus().interface();
+void MediaPlayerBackend::initMediaPlayer() {
+    QDBusConnectionInterface* interface = QDBusConnection::sessionBus().interface();
     QDBusPendingCall call               = interface->asyncCall("ListNames");
-    QDBusPendingCallWatcher *watcher    = new QDBusPendingCallWatcher(call, this);
+    QDBusPendingCallWatcher* watcher    = new QDBusPendingCallWatcher(call, this);
     connect(watcher, &QDBusPendingCallWatcher::finished, [this, call] {
         if (call.isError()) {
             return;
         }
         QDBusReply<QStringList> reply  = call.reply();
-        const QStringList &serviceList = reply.value();
+        const QStringList& serviceList = reply.value();
 
-        for (const QString &serv : serviceList) {
+        for (const QString& serv : serviceList) {
             if (!serv.startsWith("org.mpris.MediaPlayer2"))
                 continue;
 
             initSignalServer(serv);
         }
     });
-    connect(interface,
-            &QDBusConnectionInterface::serviceRegistered,
-            this,
-            [this](const QString &service) {
+    connect(interface, &QDBusConnectionInterface::serviceRegistered, this,
+            [this](const QString& service) {
                 if (service.startsWith("org.mpris.MediaPlayer2")) {
                     initSignalServer(service);
                 }
             });
-    connect(interface,
-            &QDBusConnectionInterface::serviceUnregistered,
-            this,
-            [this](const QString &service) {
+    connect(interface, &QDBusConnectionInterface::serviceUnregistered, this,
+            [this](const QString& service) {
                 if (service.startsWith("org.mpris.MediaPlayer2")) {
                     Q_EMIT serviceDeleted(service);
                 }
             });
-    connect(
-      watcher, &QDBusPendingCallWatcher::finished, watcher, &QDBusPendingCallWatcher::deleteLater);
+    connect(watcher, &QDBusPendingCallWatcher::finished, watcher,
+            &QDBusPendingCallWatcher::deleteLater);
 }
 
-void
-MediaPlayerBackend::initSignalServer(const QString &server)
-{
-    MediaPlayerInterface *interface = new MediaPlayerInterface(
-      server, "/org/mpris/MediaPlayer2", QDBusConnection::sessionBus(), this);
+void MediaPlayerBackend::initSignalServer(const QString& server) {
+    MediaPlayerInterface* interface = new MediaPlayerInterface(server, "/org/mpris/MediaPlayer2",
+                                                               QDBusConnection::sessionBus(), this);
     if ((m_service.isEmpty() && m_playBackStatus != "Playing") ||
         m_playBackStatus != "Playing" && interface->playbackStatus() == "Playing") {
         m_playBackStatus     = interface->playbackStatus();
@@ -81,10 +67,8 @@ MediaPlayerBackend::initSignalServer(const QString &server)
         Q_EMIT currentDisplayNameChanged();
     }
 
-    connect(this,
-            &MediaPlayerBackend::serviceDeleted,
-            interface,
-            [interface, server, this](const QString &name) {
+    connect(this, &MediaPlayerBackend::serviceDeleted, interface,
+            [interface, server, this](const QString& name) {
                 if (name != server) {
                     return;
                 }
@@ -101,14 +85,14 @@ MediaPlayerBackend::initSignalServer(const QString &server)
         m_canGoNext = interface->canGoNext();
         Q_EMIT canGoNextChanged();
     });
-    connect(
-      interface, &MediaPlayerInterface::CanGoPreviousChanged, this, [this, server, interface] {
-          if (m_service != server) {
-              return;
-          }
-          m_canGoPre = interface->canGoPrevious();
-          Q_EMIT canGoPreviousChanged();
-      });
+    connect(interface, &MediaPlayerInterface::CanGoPreviousChanged, this,
+            [this, server, interface] {
+                if (m_service != server) {
+                    return;
+                }
+                m_canGoPre = interface->canGoPrevious();
+                Q_EMIT canGoPreviousChanged();
+            });
 
     connect(interface, &MediaPlayerInterface::CanPauseChanged, this, [this, server, interface] {
         if (m_service != server) {
@@ -126,26 +110,26 @@ MediaPlayerBackend::initSignalServer(const QString &server)
         Q_EMIT currentDisplayNameChanged();
     });
     connect(
-      interface, &MediaPlayerInterface::PlaybackStatusChanged, this, [this, server, interface] {
-          if (m_service.isEmpty() && interface->playbackStatus() == "Playing") {
-              m_service = server;
-              Q_EMIT hasMediaChanged();
-          } else if (m_playBackStatus != "Playing" && interface->playbackStatus() == "Playing") {
-              m_service = server;
-              Q_EMIT hasMediaChanged();
-              m_currentDisplayName = interface->metadata().value("xesam:title").toString();
-              Q_EMIT currentDisplayNameChanged();
-              m_canGoPre = interface->canGoPrevious();
-              Q_EMIT canGoPreviousChanged();
-              m_canPause = interface->canPause();
-              Q_EMIT CanPauseChanged();
-          } else if (m_service != server) {
-              return;
-          }
-          m_playBackStatus = interface->playbackStatus();
+        interface, &MediaPlayerInterface::PlaybackStatusChanged, this, [this, server, interface] {
+            if (m_service.isEmpty() && interface->playbackStatus() == "Playing") {
+                m_service = server;
+                Q_EMIT hasMediaChanged();
+            } else if (m_playBackStatus != "Playing" && interface->playbackStatus() == "Playing") {
+                m_service = server;
+                Q_EMIT hasMediaChanged();
+                m_currentDisplayName = interface->metadata().value("xesam:title").toString();
+                Q_EMIT currentDisplayNameChanged();
+                m_canGoPre = interface->canGoPrevious();
+                Q_EMIT canGoPreviousChanged();
+                m_canPause = interface->canPause();
+                Q_EMIT CanPauseChanged();
+            } else if (m_service != server) {
+                return;
+            }
+            m_playBackStatus = interface->playbackStatus();
 
-          Q_EMIT playbackStatusChanged();
-      });
+            Q_EMIT playbackStatusChanged();
+        });
 
     connect(this, &MediaPlayerBackend::requestPlay, interface, [interface, this, server] {
         if (m_service != server) {
@@ -176,60 +160,39 @@ MediaPlayerBackend::initSignalServer(const QString &server)
     });
 }
 
-void
-MediaPlayerBackend::play()
-{
+void MediaPlayerBackend::play() {
     Q_EMIT requestPlay();
 }
 
-void
-MediaPlayerBackend::pause()
-{
+void MediaPlayerBackend::pause() {
     Q_EMIT requestPause();
 }
 
-void
-MediaPlayerBackend::goPre()
-{
+void MediaPlayerBackend::goPre() {
     Q_EMIT requestGoPre();
 }
 
-void
-MediaPlayerBackend::goNext()
+void MediaPlayerBackend::goNext()
 
 {
     Q_EMIT requestGoNext();
 }
 
-MediaPlayerInterface::MediaPlayerInterface(const QString &service,
-                                           const QString &path,
-                                           const QDBusConnection &connection,
-                                           QObject *parent)
-  : QDBusAbstractInterface(service, path, "org.mpris.MediaPlayer2.Player", connection, parent)
-{
-    QDBusConnection::sessionBus().connect(this->service(),
-                                          this->path(),
-                                          "org.freedesktop.DBus.Properties",
-                                          "PropertiesChanged",
-                                          "sa{sv}as",
-                                          this,
-                                          SLOT(onPropertyChanged(const QDBusMessage &)));
+MediaPlayerInterface::MediaPlayerInterface(const QString& service, const QString& path,
+                                           const QDBusConnection& connection, QObject* parent)
+    : QDBusAbstractInterface(service, path, "org.mpris.MediaPlayer2.Player", connection, parent) {
+    QDBusConnection::sessionBus().connect(
+        this->service(), this->path(), "org.freedesktop.DBus.Properties", "PropertiesChanged",
+        "sa{sv}as", this, SLOT(onPropertyChanged(const QDBusMessage&)));
 }
 
-MediaPlayerInterface::~MediaPlayerInterface()
-{
-    QDBusConnection::sessionBus().disconnect(this->service(),
-                                             this->path(),
-                                             "org.freedesktop.DBus.Properties",
-                                             "PropertiesChanged",
-                                             "sa{sv}as",
-                                             this,
-                                             SLOT(onPropertyChanged(const QDBusMessage &)));
+MediaPlayerInterface::~MediaPlayerInterface() {
+    QDBusConnection::sessionBus().disconnect(
+        this->service(), this->path(), "org.freedesktop.DBus.Properties", "PropertiesChanged",
+        "sa{sv}as", this, SLOT(onPropertyChanged(const QDBusMessage&)));
 }
 
-void
-MediaPlayerInterface::onPropertyChanged(const QDBusMessage &msg)
-{
+void MediaPlayerInterface::onPropertyChanged(const QDBusMessage& msg) {
     QList<QVariant> arguments = msg.arguments();
     if (3 != arguments.count())
         return;
@@ -240,8 +203,8 @@ MediaPlayerInterface::onPropertyChanged(const QDBusMessage &msg)
 
     QVariantMap changedProps = qdbus_cast<QVariantMap>(arguments.at(1).value<QDBusArgument>());
     QStringList keys         = changedProps.keys();
-    foreach (const QString &prop, keys) {
-        const QMetaObject *self = metaObject();
+    foreach (const QString& prop, keys) {
+        const QMetaObject* self = metaObject();
         for (int i = self->propertyOffset(); i < self->propertyCount(); ++i) {
             QMetaProperty p = self->property(i);
             if (p.name() == prop) {

@@ -28,34 +28,25 @@
 constexpr static std::string CONFIG_FILE = "config.toml";
 constexpr static std::string CONFIGDIR   = "waycratelock";
 
-static QString
-get_config_path()
-{
-    return QString::fromStdString(
-      std::format("{}/{}/{}",
-                  QStandardPaths::writableLocation(QStandardPaths::ConfigLocation).toStdString(),
-                  CONFIGDIR,
-                  CONFIG_FILE));
+static QString get_config_path() {
+    return QString::fromStdString(std::format(
+        "{}/{}/{}", QStandardPaths::writableLocation(QStandardPaths::ConfigLocation).toStdString(),
+        CONFIGDIR, CONFIG_FILE));
 }
 
-enum PamStatus
-{
+enum PamStatus {
     PamFailed,
     Successful,
     AuthFailed,
 };
 
-static int
-handle_conversation(int num_msg,
-                    const struct pam_message **msg,
-                    struct pam_response **resp,
-                    void *data)
-{
+static int handle_conversation(int num_msg, const struct pam_message** msg,
+                               struct pam_response** resp, void* data) {
     /* PAM expects an array of responses, one for each message */
-    auto thisptr = static_cast<Commandline *>(data);
+    auto thisptr = static_cast<Commandline*>(data);
 
-    struct pam_response *pam_reply =
-      static_cast<struct pam_response *>(calloc(num_msg, sizeof(struct pam_response)));
+    struct pam_response* pam_reply =
+        static_cast<struct pam_response*>(calloc(num_msg, sizeof(struct pam_response)));
     if (pam_reply == nullptr) {
         return PAM_ABORT;
     }
@@ -81,12 +72,9 @@ handle_conversation(int num_msg,
     return PAM_SUCCESS;
 }
 
-Commandline::Commandline(QObject *parent)
-  : QObject(parent)
-  , m_usePam(true)
-  , m_backgroundImagePath(QUrl("qrc:/image/gangdamu.png"))
-  , m_opacity(1)
-{
+Commandline::Commandline(QObject* parent)
+    : QObject(parent), m_usePam(true), m_backgroundImagePath(QUrl("qrc:/image/gangdamu.png")),
+      m_opacity(1) {
     m_username = QString::fromStdString(getlogin());
     readConfig();
     if (!m_usePam) {
@@ -95,9 +83,7 @@ Commandline::Commandline(QObject *parent)
     startPam();
 }
 
-Commandline::~Commandline()
-{
-
+Commandline::~Commandline() {
     for (auto handle : m_handles.asKeyValueRange()) {
         pam_end(handle.second, PAM_SUCCESS);
         handle.second = nullptr;
@@ -107,19 +93,16 @@ Commandline::~Commandline()
     }
 }
 
-void
-Commandline::startPam()
-{
+void Commandline::startPam() {
     const struct pam_conv conv = {
-      .conv        = &handle_conversation,
-      .appdata_ptr = this,
+        .conv        = &handle_conversation,
+        .appdata_ptr = this,
     };
     bool strict = true; // First one should be waycratelock
     for (auto name : m_handles.keys()) {
-        auto *handle =
-          initPam(name.toLocal8Bit().data(),
-                  &conv,
-                  m_username.toLocal8Bit().data()); // pam_start copies and clears username pointer.
+        auto* handle = initPam(
+            name.toLocal8Bit().data(), &conv,
+            m_username.toLocal8Bit().data()); // pam_start copies and clears username pointer.
         if (handle != nullptr) {
             m_handles[name] = handle;
             m_guards.insert(name, new std::mutex());
@@ -139,18 +122,15 @@ Commandline::startPam()
     }
 }
 
-pam_handle_t *
-Commandline::initPam(const char *pam_name, const struct pam_conv *conv, const char *username)
-{
-    pam_handle_t *handle = nullptr;
+pam_handle_t*
+Commandline::initPam(const char* pam_name, const struct pam_conv* conv, const char* username) {
+    pam_handle_t* handle = nullptr;
     if (pam_start(pam_name, username, conv, &handle) != PAM_SUCCESS)
         return nullptr;
     return handle;
 }
 
-QString
-Commandline::parsePath(const QString &string)
-{
+QString Commandline::parsePath(const QString& string) {
     QString result;
     glob_t globbuf;
     if (glob(string.toStdString().c_str(), GLOB_TILDE, NULL, &globbuf) == 0) {
@@ -162,9 +142,7 @@ Commandline::parsePath(const QString &string)
     return result;
 }
 
-void
-Commandline::readConfig()
-{
+void Commandline::readConfig() {
     QString configpath = get_config_path();
     if (!QFile(configpath).exists()) {
         return;
@@ -194,39 +172,31 @@ Commandline::readConfig()
             auto backgroundImg    = parsePath(QString::fromStdString(background.value()));
             m_backgroundImagePath = QUrl::fromLocalFile(backgroundImg);
         }
-    } catch (const toml::parse_error &err) {
+    } catch (const toml::parse_error& err) {
         showTimedMessage("Something error with config file", true);
         qWarning() << err.what();
     }
 }
 
-void
-Commandline::setPassword(const QString &password)
-{
+void Commandline::setPassword(const QString& password) {
     m_password = password;
     Q_EMIT passwordChanged();
 }
 
-void
-Commandline::unlock()
-{
+void Commandline::unlock() {
     setExiting(true);
-    QTimer::singleShot(
-      fadeOut(), qApp, [] { NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->unlockScreen();) });
+    QTimer::singleShot(fadeOut(), qApp,
+                       [] { NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->unlockScreen();) });
     QTimer::singleShot(fadeOut() + 1, qApp, [] { QGuiApplication::quit(); });
 }
 
-void
-Commandline::showTimedMessage(QString message, bool error, int timeSeconds)
-{
+void Commandline::showTimedMessage(QString message, bool error, int timeSeconds) {
     auto msg = Message(message, error);
     messages()->addMessage(msg);
     QTimer::singleShot(timeSeconds, this, [this, msg] { messages()->removeMessage(msg); });
 }
 
-void
-Commandline::runPamUnlock(auto *handle, std::mutex *mutex, bool silent)
-{
+void Commandline::runPamUnlock(auto* handle, std::mutex* mutex, bool silent) {
     if (!silent)
         setBusy(true);
 
@@ -262,9 +232,7 @@ Commandline::runPamUnlock(auto *handle, std::mutex *mutex, bool silent)
     });
 }
 
-void
-Commandline::requestUnlock()
-{
+void Commandline::requestUnlock() {
     if (!m_usePam) {
         unlock();
         return;
