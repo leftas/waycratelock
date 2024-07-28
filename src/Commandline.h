@@ -14,6 +14,7 @@ class Commandline final : public QObject
 
 public:
     explicit Commandline(QObject *parent = nullptr);
+     ~Commandline();
 
     Q_PROPERTY(QString password READ password WRITE setPassword NOTIFY passwordChanged)
     inline QString password() { return m_password; }
@@ -65,6 +66,9 @@ private:
         m_exiting = value;
         emit exitingChanged();
     }
+    void runPamUnlock(auto *handle, std::mutex *mutex, bool silent);
+    void startPam();
+    pam_handle_t *initPam(const char *pam_name, const struct pam_conv *conv, const char *username);
 
 signals:
     void currentDateChanged();
@@ -84,12 +88,13 @@ private:
     QString m_currentDate;
     QString m_password;
     QString m_username;
-    pam_handle_t *m_handle;
+    QMap<QString, pam_handle_t *> m_handles{{"waycratelock", nullptr}};
+    QMap<QString, std::mutex *> m_guards;
     QUrl m_backgroundImagePath;
     double m_opacity;
     int m_fadeIn;
     int m_fadeOut;
     bool m_usePam;
-    bool m_busy              = false;
-    bool m_exiting           = false;
+    bool m_busy    = false;
+    bool m_exiting = false;
 };

@@ -1,4 +1,5 @@
 #include "Commandline.h"
+#include <_pam_types.h>
 #include <glob.h>
 #include <qlogging.h>
 #include <qnamespace.h>
@@ -27,8 +28,6 @@
 constexpr static std::string CONFIG_FILE = "config.toml";
 constexpr static std::string CONFIGDIR   = "waycratelock";
 
-static std::mutex PAM_GUARD;
-
 static QString
 get_config_path()
 {
@@ -44,7 +43,6 @@ enum PamStatus
     PamFailed,
     Successful,
     AuthFailed,
-
 };
 
 static int
@@ -94,16 +92,60 @@ Commandline::Commandline(QObject *parent)
     if (!m_usePam) {
         return;
     }
+    startPam();
+}
+
+Commandline::~Commandline()
+{
+
+    for (auto handle : m_handles.asKeyValueRange()) {
+        pam_end(handle.second, PAM_SUCCESS);
+        handle.second = nullptr;
+    }
+    for (auto guard : m_guards.values()) {
+        delete guard;
+    }
+}
+
+void
+Commandline::startPam()
+{
     const struct pam_conv conv = {
       .conv        = &handle_conversation,
       .appdata_ptr = this,
     };
-    if (pam_start("waycratelock", m_username.toLocal8Bit().data(), &conv, &m_handle) !=
-        PAM_SUCCESS) {
-        qWarning() << "Cannot start pam";
-        QTimer::singleShot(0, this, [this] { this->unlock(); });
-        return;
+    bool strict = true; // First one should be waycratelock
+    for (auto name : m_handles.keys()) {
+        auto *handle =
+          initPam(name.toLocal8Bit().data(),
+                  &conv,
+                  m_username.toLocal8Bit().data()); // pam_start copies and clears username pointer.
+        if (handle != nullptr) {
+            m_handles[name] = handle;
+            m_guards.insert(name, new std::mutex());
+            // if (!strict)
+            //     QTimer::singleShot(
+            //       5, this, [this, handle, name] { runPamUnlock(handle, m_guards[name], true); });
+        } else {
+            if (strict) {
+                qWarning() << "Cannot start pam";
+                QTimer::singleShot(0, this, [this] { this->unlock(); });
+                return;
+            }
+            qWarning() << "Cannot start pam for" << name;
+            m_handles.remove(name);
+        }
+        strict = false;
     }
+}
+
+pam_handle_t *
+Commandline::initPam(const char *pam_name, const struct pam_conv *conv, const char *username)
+{
+    pam_handle_t *handle = nullptr;
+    if (pam_start(pam_name, username, conv, &handle) != PAM_SUCCESS)
+        return nullptr;
+    return handle;
 }
 
 QString
@@ -130,6 +172,7 @@ Commandline::readConfig()
     try {
         auto tbl                              = toml::parse_file(configpath.toStdString());
         std::optional<bool> usePam            = tbl["general"]["needPassword"].value<bool>();
+        std::optional<std::string> pamConfigs = tbl["general"]["pamConfigs"].value<std::string>();
         std::optional<std::string> background = tbl["background"]["path"].value<std::string>();
         std::optional<double> opacity         = tbl["background"]["opacity"].value<float>();
         std::optional<int> fadeIn             = tbl["background"]["fadein"].value<int>();
@@ -139,6 +182,13 @@ Commandline::readConfig()
         m_usePam  = usePam.value_or(true);
         m_fadeIn  = fadeIn.value_or(0);
         m_fadeOut = fadeOut.value_or(0);
+
+        if (pamConfigs.has_value()) {
+            auto names = QString::fromStdString(pamConfigs.value());
+            for (auto name : names.split(",")) {
+                m_handles.insert(name.trimmed(), nullptr);
+            }
+        }
 
         if (background.has_value()) {
             auto backgroundImg    = parsePath(QString::fromStdString(background.value()));
@@ -175,6 +225,44 @@ Commandline::showTimedMessage(QString message, bool error, int timeSeconds)
 }
 
 void
+Commandline::runPamUnlock(auto *handle, std::mutex *mutex, bool silent)
+{
+    if (!silent)
+        setBusy(true);
+
+    QtConcurrent::run([mutex, handle, silent] {
+        std::lock_guard guard{*mutex};
+        int pam_status = pam_authenticate(handle, silent ? PAM_DISALLOW_NULL_AUTHTOK : 0);
+        if (pam_status != PAM_SUCCESS) {
+            return PamStatus::AuthFailed;
+        }
+        pam_setcred(handle, PAM_REFRESH_CRED);
+        if (pam_end(handle, pam_status) != PAM_SUCCESS) {
+            return PamStatus::PamFailed;
+        }
+        return PamStatus::Successful;
+    }).then([this, silent](PamStatus value) {
+        if (!silent)
+            setBusy(false);
+        switch (value) {
+        case PamFailed: {
+            if (!silent)
+                showTimedMessage("Pam end failed!", true);
+        }
+        case Successful: {
+            unlock();
+            break;
+        }
+        case AuthFailed: {
+            if (!silent)
+                showTimedMessage("Failed to unlock. Check your password", true);
+            break;
+        }
+        }
+    });
+}
+
+void
 Commandline::requestUnlock()
 {
     if (!m_usePam) {
@@ -182,33 +270,5 @@ Commandline::requestUnlock()
         return;
     }
 
-    setBusy(true);
-
-    QtConcurrent::run([this] {
-        std::lock_guard<std::mutex> guard(PAM_GUARD);
-        int pam_status = pam_authenticate(m_handle, 0);
-        if (pam_status != PAM_SUCCESS) {
-            return PamStatus::AuthFailed;
-        }
-        pam_setcred(m_handle, PAM_REFRESH_CRED);
-        if (pam_end(m_handle, pam_status) != PAM_SUCCESS) {
-            return PamStatus::PamFailed;
-        }
-        return PamStatus::Successful;
-    }).then([this](PamStatus value) {
-        setBusy(false);
-        switch (value) {
-        case PamFailed: {
-            showTimedMessage("Pam end failed!", true);
-        }
-        case Successful: {
-            unlock();
-            break;
-        }
-        case AuthFailed: {
-            showTimedMessage("Failed to unlock. Check your password", true);
-            break;
-        }
-        }
-    });
+    runPamUnlock(m_handles["waycratelock"], m_guards["waycratelock"], false);
 }
