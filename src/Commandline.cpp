@@ -207,9 +207,6 @@ void Commandline::runPamUnlock(auto* handle, std::mutex* mutex, bool silent) {
             return PamStatus::AuthFailed;
         }
         pam_setcred(handle, PAM_REFRESH_CRED);
-        if (pam_end(handle, pam_status) != PAM_SUCCESS) {
-            return PamStatus::PamFailed;
-        }
         return PamStatus::Successful;
     }).then([this, silent](PamStatus value) {
         if (!silent)
