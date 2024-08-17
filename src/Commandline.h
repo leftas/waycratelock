@@ -46,12 +46,16 @@ class Commandline final : public QObject {
     Q_PROPERTY(int fadeOut READ fadeOut NOTIFY fadeOutChanged)
     inline int fadeOut() { return m_fadeOut; }
 
+    Q_PROPERTY(int capsLocked READ capsLocked WRITE setCapsLocked NOTIFY capsLockedChanged)
+    inline bool capsLocked() { return m_capsLocked; }
+    inline void setCapsLocked(bool value) { m_capsLocked = value; emit capsLockedChanged(); }
     Q_INVOKABLE void unlock();
     Q_INVOKABLE void requestUnlock();
 
     void showTimedMessage(QString message, bool error, int timeSeconds = 3000);
 
   private:
+    void checkCapsLock();
     void readConfig();
     QString parsePath(const QString& command);
 
@@ -79,6 +83,7 @@ class Commandline final : public QObject {
     void exitingChanged();
     void fadeInChanged();
     void fadeOutChanged();
+    void capsLockedChanged();
 
   private:
     MessageModel* m_messages = new MessageModel;
@@ -94,4 +99,5 @@ class Commandline final : public QObject {
     bool m_usePam;
     bool m_busy    = false;
     bool m_exiting = false;
+    bool m_capsLocked = false;
 };

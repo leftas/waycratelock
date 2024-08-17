@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 
 project(waycratelock
   VERSION 0.1
@@ -24,20 +24,19 @@ endif ()
 
 include(GNUInstallDirs)
 
-find_package(Qt6 COMPONENTS Quick QuickControls2 Concurrent WaylandClient DBus REQUIRED)
-
+find_package(Qt6 COMPONENTS Quick QuickControls2 Concurrent WaylandClient DBus Gui REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(SessionLockQt REQUIRED)
-
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PAM pam pam_misc pamc REQUIRED IMPORTED_TARGET)
+pkg_check_modules(xkbCommon xkbcommon REQUIRED IMPORTED_TARGET)
 
 qt_add_executable(waycratelock
   src/main.cpp
   asserts/source.qrc
 )
 
-target_include_directories(waycratelock PUBLIC
+target_include_directories(waycratelock PRIVATE
   ${CMAKE_SOURCE_DIR}/src
 )
 
@@ -65,7 +64,10 @@ target_link_libraries(waycratelock
   Qt6::Concurrent
   Qt6::DBus
   SessionLockQt::Interface
-  PkgConfig::PAM)
+  PkgConfig::PAM
+  PkgConfig::xkbCommon
+  tomlplusplus::tomlplusplus
+)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/misc/waycratelock DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/pam.d)
 

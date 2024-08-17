@@ -11,6 +11,7 @@ Page {
     property date currentTime: new Date()
     property bool busy: Commandline.busy
     property bool exiting: Commandline.exiting
+    property bool capslocks: Commandline.capsLocked
 
     function leftPad(number) {
         var output = number + '';
@@ -86,7 +87,9 @@ Page {
         currentTime = date;
     }
 
-    Keys.onPressed: {
+    Keys.onPressed: (event) => {
+        if(event.key == Qt.Key_CapsLock)
+            root.capslocks = !root.capslocks;
         root.isIn = true;
         root.forceActiveFocus();
         input.focus = true;
@@ -201,6 +204,20 @@ Page {
 
             Item {
                 Layout.preferredHeight: 30
+            }
+
+            Frame {
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.isIn && root.capslocks
+                background: Rectangle {
+                    color: "yellow"
+                    radius: 25
+                }
+                Label {
+                    anchors.centerIn: parent
+                    color: "black"
+                    text: "Caps locks is on!"
+                }
             }
 
             TextField {

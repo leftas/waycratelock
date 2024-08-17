@@ -1,8 +1,15 @@
 #include "Commandline.h"
 #include <_pam_types.h>
 #include <glob.h>
+#include <private/qwaylanddisplay_p.h>
+#include <private/qwaylandinputdevice_p.h>
+#include <private/qwaylandwindow_p.h>
+#include <qguiapplication.h>
+#include <qinputdevice.h>
 #include <qlogging.h>
 #include <qnamespace.h>
+#include <qobject.h>
+#include <qwindow.h>
 
 #ifdef DEBUG_MODE
 #define NON_DEBUG(EXP)                                                                             \
@@ -13,12 +20,17 @@
 #include <SessionLockQt/command.h>
 #endif
 
+#include <QCoreApplication>
 #include <QDate>
 #include <QGuiApplication>
 #include <QLocale>
 #include <QTimer>
 #include <QtConcurrent>
 
+#include <xkbcommon/xkbcommon-names.h>
+#include <xkbcommon/xkbcommon.h>
+
+#include "access_private.hpp"
 #include <format>
 #include <mutex>
 #include <string>
@@ -72,11 +84,49 @@ static int handle_conversation(int num_msg, const struct pam_message** msg,
     return PAM_SUCCESS;
 }
 
+// Some hacky way of getting xkb state of wayland keyboard.
+namespace access_private {
+template struct access<&QtWaylandClient::QWaylandInputDevice::Keyboard::mXkbState>;
+}
+
+void Commandline::checkCapsLock() {
+    auto win = qGuiApp->focusWindow();
+    if (!win)
+        return;
+
+    auto wWin = win->nativeInterface<QtWaylandClient::QWaylandWindow>();
+    if (!wWin)
+        return;
+
+    auto display = wWin->display();
+    if (!display)
+        return;
+
+    auto inputDevice = display->currentInputDevice();
+    if (!inputDevice)
+        return;
+
+    auto keyboard = inputDevice->keyboard();
+    if (!keyboard)
+        return;
+
+    auto& xkbstate = access_private::accessor<"mXkbState">(keyboard);
+
+    bool isCapsLocked =
+        xkb_state_mod_name_is_active(xkbstate.get(), XKB_MOD_NAME_CAPS, XKB_STATE_MODS_LOCKED);
+
+    setCapsLocked(isCapsLocked);
+}
+
 Commandline::Commandline(QObject* parent)
     : QObject(parent), m_usePam(true), m_backgroundImagePath(QUrl("qrc:/image/gangdamu.png")),
       m_opacity(1) {
     m_username = QString::fromStdString(getlogin());
     readConfig();
+    auto app = qGuiApp;
+    QObject::connect(
+        app, &QGuiApplication::focusWindowChanged, app,
+        [this](QWindow* window) { checkCapsLock(); }, Qt::SingleShotConnection);
     if (!m_usePam) {
         return;
     }
