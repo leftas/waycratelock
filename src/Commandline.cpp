@@ -47,7 +47,6 @@ static QString get_config_path() {
 }
 
 enum PamStatus {
-    PamFailed,
     Successful,
     AuthFailed,
 };
@@ -76,6 +75,7 @@ static int handle_conversation(int num_msg, const struct pam_message** msg,
             break;
         case PAM_ERROR_MSG:
             thisptr->showTimedMessage(msg[i]->msg, true);
+            break;
         case PAM_TEXT_INFO:
             thisptr->showTimedMessage(msg[i]->msg, false, 6000);
             break;
@@ -156,9 +156,9 @@ void Commandline::startPam() {
         if (handle != nullptr) {
             m_handles[name] = handle;
             m_guards.insert(name, new std::mutex());
-            // if (!strict)
-            //     QTimer::singleShot(
-            //       5, this, [this, handle, name] { runPamUnlock(handle, m_guards[name], true); });
+            if (!strict)
+                QTimer::singleShot(
+                    5, this, [this, handle, name] { runPamUnlock(handle, m_guards[name], true); });
         } else {
             if (strict) {
                 qWarning() << "Cannot start pam";
@@ -262,10 +262,6 @@ void Commandline::runPamUnlock(auto* handle, std::mutex* mutex, bool silent) {
         if (!silent)
             setBusy(false);
         switch (value) {
-        case PamFailed: {
-            if (!silent)
-                showTimedMessage("Pam end failed!", true);
-        }
         case Successful: {
             unlock();
             break;

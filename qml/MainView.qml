@@ -336,21 +336,37 @@ Page {
                 readonly property int itemPadding: 4
                 readonly property TextMetrics tm: TextMetrics { text: "#" }
                 readonly property int itemHeight: tm.height + itemPadding * 2
-                readonly property int maxItems: 4
-                Layout.minimumWidth: 250
+                readonly property int maxItems: 2
                 Layout.alignment: Qt.AlignHCenter
+                Layout.minimumWidth: tm.width * 40
                 Layout.minimumHeight: itemHeight
-                Layout.maximumHeight: itemHeight * maxItems
+                Layout.preferredHeight: itemHeight
+                Layout.maximumHeight: itemHeight * maxItems + itemPadding
+                Layout.fillHeight: true
                 model: Commandline.messages
+                spacing: itemPadding
+                clip: true
+
+                Timer {
+                    id: positionTimer
+                    interval: 200
+                    repeat: false
+                    onTriggered: list.positionViewAtIndex(list.count - 1, ListView.Visible)
+                }
+
+                onCountChanged: {
+                    positionTimer.start()
+                }
+
                 delegate: Item {
                     required property string message
                     required property bool error
-                    width: list.width
+                    width: parent?.width ?? 0
                     height: list.itemHeight
                     Frame {
-                        width: list.width
-                        height: parent.height
-                        padding: 0
+                        anchors.centerIn: parent
+                        height: list.itemHeight
+                        padding: list.itemPadding
                         background: Rectangle {
                             color: error ? "red" : "yellow"
                             radius: 25
