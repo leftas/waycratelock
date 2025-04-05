@@ -103,12 +103,5 @@ int main(int argc, char* argv[]) {
     NON_DEBUG(ExtSessionLockV1Qt::Command::instance()->lockScreen();)
     QQuickWindow* window = qobject_cast<QQuickWindow*>(engine.rootObjects().last());
 
-    // So we could start inputting text right away
-    // auto root = window->findChild<QQuickItem *>("root");
-    // if (root) {
-    //     root->setProperty("isIn", true);
-    //     root->forceActiveFocus();
-    // }
-
     return app.exec();
 }
